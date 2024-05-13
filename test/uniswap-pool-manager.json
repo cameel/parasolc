@@ -1,0 +1,41 @@
+{
+    "language": "Solidity",
+    "sources": {
+        "test/PoolManager.t.sol": {"urls": ["test/PoolManager.t.sol"]}
+    },
+    "settings": {
+        "remappings": [
+            "@ensdomains/=node_modules/@ensdomains/",
+            "@openzeppelin/=lib/openzeppelin-contracts/",
+            "ds-test/=lib/forge-std/lib/ds-test/src/",
+            "forge-gas-snapshot/=lib/forge-gas-snapshot/src/",
+            "forge-std/=lib/forge-std/src/",
+            "hardhat/=node_modules/hardhat/",
+            "solmate/=lib/solmate/src/",
+            "openzeppelin-contracts/=lib/openzeppelin-contracts/contracts/"
+        ],
+        "optimizer": {
+            "enabled": true,
+            "runs": 800
+        },
+        "metadata": {
+            "useLiteralContent": false,
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+        },
+        "outputSelection": {
+            "*": {
+                "*": [
+                    "abi",
+                    "evm.bytecode",
+                    "evm.deployedBytecode",
+                    "evm.methodIdentifiers",
+                    "metadata"
+                ]
+            }
+        },
+        "evmVersion": "cancun",
+        "viaIR": true,
+        "libraries": {}
+    }
+}

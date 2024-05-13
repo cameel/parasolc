@@ -1,0 +1,40 @@
+{
+    "language": "Solidity",
+    "sources": {
+        "contracts/mocks/token/ERC20Mock.sol":                 {"urls": ["contracts/mocks/token/ERC20Mock.sol"]},
+        "contracts/token/ERC20/ERC20.sol":                     {"urls": ["contracts/token/ERC20/ERC20.sol"]},
+        "contracts/token/ERC20/IERC20.sol":                    {"urls": ["contracts/token/ERC20/IERC20.sol"]},
+        "contracts/token/ERC20/extensions/IERC20Metadata.sol": {"urls": ["contracts/token/ERC20/extensions/IERC20Metadata.sol"]},
+        "contracts/utils/Context.sol":                         {"urls": ["contracts/utils/Context.sol"]},
+        "contracts/interfaces/draft-IERC6093.sol":             {"urls": ["contracts/interfaces/draft-IERC6093.sol"]}
+    },
+    "settings": {
+        "remappings": [
+            "@openzeppelin/contracts/=contracts/"
+        ],
+        "outputSelection": {
+            "*": {
+                "*": [
+                    "abi",
+                    "evm.bytecode",
+                    "evm.deployedBytecode",
+                    "evm.methodIdentifiers",
+                    "metadata"
+                ]
+            }
+        },
+        "metadata": {
+            "useLiteralContent": false,
+            "bytecodeHash": "ipfs",
+            "appendCBOR": true
+        },
+        "optimizer": {
+            "enabled": true,
+            "runs": 200
+        },
+        "evmVersion": "cancun",
+        "viaIR": true,
+        "libraries": {},
+        "debug": {"debugInfo": []}
+    }
+}
