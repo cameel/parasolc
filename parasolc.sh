@@ -44,20 +44,18 @@ function select_contract {
         '
 }
 
-function merge_contract_output {
-    jq '.contracts | to_entries[]' \
-        | jq --slurp --indent 4 '
-            group_by(.key) | map({
-                (map(.key) | first): map(.value) | add
-            }) | add
-        '
+function remove_null_keys {
+    jq --indent 4 '[to_entries[] | select(.value != null)] | from_entries'
 }
 
-function graft_contract_output_on_full_output {
-    local main_output_file="$1"
-    local contract_output_file="$2"
-
-    jq --slurp --indent 4 '.[0].contracts = .[1] | .[0]' "$main_output_file" "$contract_output_file"
+function merge_output {
+    jq --slurp --indent 4 '{
+        contracts: [.[].contracts // {} | to_entries] | add | group_by(.key) | map({
+            (map(.key) | first): map(.value) | add
+        }) | add,
+        errors:  [.[].errors]  | add | (if . != null then unique else . end),
+        sources: [.[].sources] | add
+    }' | remove_null_keys
 }
 
 # INPUT VALIDATION
@@ -133,14 +131,8 @@ contracts_in_output < "${tmp_dir}/analysis-output.json" \
     | xargs --max-procs=0 --delimiter=$'\n' -I {} bash -c "$subprocess_script"
 
 # Combine the .contracts from each output file. These should not overlap.
-# Then add the remaining keys from the initial compilation for metadata only. They should be almost
-# the same in all output files.
 cat "${tmp_dir}"/partial-output-*.json \
-    | merge_contract_output \
-    >> "${tmp_dir}/combined-output-contracts-only.json"
-graft_contract_output_on_full_output \
-    "${tmp_dir}/analysis-output.json" \
-    "${tmp_dir}/combined-output-contracts-only.json" \
+    | merge_output \
     | tee "${tmp_dir}/combined-output.json"
 
 rm -r "$tmp_dir"
