@@ -12,7 +12,8 @@ contracts/: test/setup.sh
 	test/setup.sh
 
 benchmark: contracts/ test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" test/benchmark.sh
+	SOLC_BINARY="$(SOLC_BINARY)" SPLIT_METHOD=naive     test/benchmark.sh
+	SOLC_BINARY="$(SOLC_BINARY)" SPLIT_METHOD=clustered test/benchmark.sh
 
 solc: compilation-hints-output-with-bytecode-dependency-clusters.patch
 	git clone https://github.com/ethereum/solidity --branch "v0.8.26" --depth 1

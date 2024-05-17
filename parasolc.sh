@@ -5,6 +5,7 @@ script_dir="$(dirname "$0")"
 
 # Use global `solc` by default, but let user specify a different binary by overriding the variable.
 SOLC_BINARY="${SOLC_BINARY:-solc}"
+SPLIT_METHOD="${SPLIT_METHOD:-naive}"
 
 source "${script_dir}/standard-json-utils.sh"
 
@@ -16,23 +17,36 @@ echo "$INPUT" > "${tmp_dir}/input.json"
 
 # Modify original input to request metadata output only and compile that.
 # This is quick and gives us the full list of contracts, including those pulled in via imports.
-select_metadata_only < "${tmp_dir}/input.json" \
+select_analysis_outputs < "${tmp_dir}/input.json" \
     | "$SOLC_BINARY" "${SOLC_ARGS[@]}" \
     | jq --indent 4 \
     > "${tmp_dir}/analysis-output.json"
 
+# TODO: Detect missing compilationHints in the output. The compiler does not fail on invalid
+# outputs, making the behavior confusing if someone tries an older compiler that does not has this output.
 if has_compilation_errors < "${tmp_dir}/analysis-output.json"; then
     cat "${tmp_dir}/analysis-output.json"
     exit 0
 fi
 
-i=0
-contracts_in_output < "${tmp_dir}/analysis-output.json" | while IFS= read -r selected_contract_json; do
-    select_contract "$selected_contract_json" \
-        < "${tmp_dir}/input.json" \
-        > "${tmp_dir}/partial-input-${i}.json"
-    ((++i))
-done
+if [[ $SPLIT_METHOD == clustered ]]; then
+    for cluster_id in $(contracts_in_output < "${tmp_dir}/analysis-output.json" | cluster_ids); do
+        select_contracts \
+            <(contracts_in_output < "${tmp_dir}/analysis-output.json" | select_cluster "$cluster_id") \
+            < "${tmp_dir}/input.json" \
+            > "${tmp_dir}/partial-input-${cluster_id}.json"
+    done
+elif [[ $SPLIT_METHOD == naive ]]; then
+    i=0
+    contracts_in_output < "${tmp_dir}/analysis-output.json" | while IFS= read -r selected_contract_json; do
+        select_contract "$selected_contract_json" \
+            < "${tmp_dir}/input.json" \
+            > "${tmp_dir}/partial-input-${i}.json"
+        ((++i))
+    done
+else
+    fail "Unknown split method: ${SPLIT_METHOD}"
+fi
 
 # Modify original input again, this time to get a full set of inputs, each for a single contract.
 # Use xargs to run solc on each of the new inputs in parallel.
