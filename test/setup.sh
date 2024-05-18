@@ -8,6 +8,9 @@ mkdir -p "${script_dir}/../contracts/"
 cd "${script_dir}/../contracts/"
 
 git clone --depth=1 https://github.com/OpenZeppelin/openzeppelin-contracts --branch v5.0.2
+cd openzeppelin-contracts/
+forge install
+cd ..
 
 git clone https://github.com/Uniswap/v4-core
 cd v4-core/

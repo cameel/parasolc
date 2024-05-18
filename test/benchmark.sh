@@ -58,6 +58,43 @@ function execute_test {
     echo
 }
 
+function forge_build {
+    local solc_path="$1"
+    local wrapper_path="$2"
+
+    SOLC_BINARY="$solc_path" \
+    forge build \
+        --use "$wrapper_path" \
+        --optimize \
+        --via-ir \
+        --evm-version cancun \
+        --offline \
+        --no-cache
+}
+
+function foundry_benchmark {
+    local project_subdir="$1"
+
+    local output_dir solc_path parasolc_path project_dir
+    output_dir=$(realpath ../results/)
+    # Use `command` to make it work with a system-wide `solc` binary as well.
+    solc_path=$(realpath "$(command -v "$SOLC_BINARY")")
+    parasolc_path=$(realpath ../parasolc.sh)
+    project_dir="../contracts/${project_subdir}"
+
+    pushd "${project_dir}" > /dev/null
+
+    echo "${project_subdir}: foundry+solc"
+    time_to_json_file "${output_dir}/time-${project_subdir}-foundry+solc.json" forge_build "$solc_path" "$solc_path"
+    jq . "${output_dir}/time-${project_subdir}-foundry+solc.json"
+
+    echo "${project_subdir}: foundry+parasolc"
+    time_to_json_file "${output_dir}/time-${project_subdir}-foundry+parasolc.json" forge_build  "$solc_path" "$parasolc_path"
+    jq . "${output_dir}/time-${project_subdir}-foundry+parasolc.json"
+
+    popd > /dev/null
+}
+
 cd "$script_dir"
 rm -rf ../results/
 mkdir -p ../results/
@@ -71,3 +108,6 @@ execute_test oz       openzeppelin-contracts || true
 execute_test uniswap-pool-manager  v4-core || true
 execute_test uniswap-big-contracts v4-core || true
 execute_test uniswap               v4-core || true
+
+foundry_benchmark openzeppelin-contracts || true
+foundry_benchmark v4-core                || true
