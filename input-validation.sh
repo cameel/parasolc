@@ -8,6 +8,11 @@
 SOLC_ARGS=()
 INPUT=$(cat)
 
+if [[ $* == --version ]]; then
+    "${SOLC_BINARY}" --version
+    exit 0
+fi
+
 standard_json_requested=faise
 while (( $# > 0 )); do
     [[ ! $1 =~ ' ' ]] || fail "Whitespace in arguments not supported."
