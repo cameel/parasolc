@@ -47,6 +47,16 @@ function select_contract {
     select_contracts <(echo "$source_and_contract_name_json")
 }
 
+function drop_unselected_sources {
+    jq --indent 4 '
+        .sources = (
+            .settings.outputSelection as $outputSelection
+            | .sources
+            | with_entries(select(.key | in($outputSelection)))
+        )
+    '
+}
+
 function select_contracts {
     local arg_file="$1"
 

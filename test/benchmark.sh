@@ -6,6 +6,7 @@ cd "$script_dir"
 
 export SOLC_BINARY="${SOLC_BINARY:-"../solc"}"
 export SPLIT_METHOD="${SPLIT_METHOD:-naive}"
+export ONLY_RELEVANT_SOURCES="${ONLY_RELEVANT_SOURCES:-false}"
 
 function time_to_json_file
 {

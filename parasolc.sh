@@ -5,6 +5,7 @@ script_dir="$(dirname "$0")"
 
 SOLC_BINARY="${SOLC_BINARY:-"${script_dir}/solc"}"
 SPLIT_METHOD="${SPLIT_METHOD:-naive}"
+ONLY_RELEVANT_SOURCES="${ONLY_RELEVANT_SOURCES:-false}"
 
 source "${script_dir}/standard-json-utils.sh"
 
@@ -13,6 +14,16 @@ source "${script_dir}/input-validation.sh"
 
 tmp_dir=$(mktemp -d -t parasolc-XXXXXX)
 echo "$INPUT" > "${tmp_dir}/input.json"
+
+function strip_irrelevant_sources_if_requested {
+    if [[ $ONLY_RELEVANT_SOURCES == true ]]; then
+        drop_unselected_sources
+    elif [[ $ONLY_RELEVANT_SOURCES == false ]]; then
+        cat
+    else
+        fail "Non-boolean value for ONLY_RELEVANT_SOURCES: ${ONLY_RELEVANT_SOURCES}"
+    fi
+}
 
 # Modify original input to request metadata output only and compile that.
 # This is quick and gives us the full list of contracts, including those pulled in via imports.
@@ -33,6 +44,7 @@ if [[ $SPLIT_METHOD == clustered ]]; then
         select_contracts \
             <(contracts_in_output < "${tmp_dir}/analysis-output.json" | select_cluster "$cluster_id") \
             < "${tmp_dir}/input.json" \
+            | strip_irrelevant_sources_if_requested \
             > "${tmp_dir}/partial-input-${cluster_id}.json"
     done
 elif [[ $SPLIT_METHOD == naive ]]; then
@@ -40,6 +52,7 @@ elif [[ $SPLIT_METHOD == naive ]]; then
     contracts_in_output < "${tmp_dir}/analysis-output.json" | while IFS= read -r selected_contract_json; do
         select_contract "$selected_contract_json" \
             < "${tmp_dir}/input.json" \
+            | strip_irrelevant_sources_if_requested \
             > "${tmp_dir}/partial-input-${i}.json"
         ((++i))
     done
