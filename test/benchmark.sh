@@ -4,7 +4,8 @@ set -euo pipefail
 script_dir="$(dirname "$0")"
 cd "$script_dir"
 
-export SOLC_BINARY="${SOLC_BINARY:-"../solc"}"
+PARASOLC_OUTPUT_DIR="${PARASOLC_OUTPUT_DIR:-..}"
+export SOLC_BINARY="${SOLC_BINARY:-"${PARASOLC_OUTPUT_DIR}/solc"}"
 export SPLIT_METHOD="${SPLIT_METHOD:-naive}"
 export ONLY_RELEVANT_SOURCES="${ONLY_RELEVANT_SOURCES:-false}"
 
@@ -33,31 +34,33 @@ function execute_test {
     local test_name="$1"
     local project_subdir="$2"
 
-    local project_dir="../contracts/${project_subdir}"
+    local project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
     local input_json="${project_dir}/${test_name}.json"
     cp "${test_name}.json" "$input_json"
 
     printf "%s" "${test_name}: solc"
+    local output_json_solc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-solc-output.json"
+    local output_time_solc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-solc.json"
     time_to_json_file \
-        "../results/time-${test_name}-solc.json" \
+        "$output_time_solc" \
         "$SOLC_BINARY" --standard-json - --base-path "$project_dir" \
             < "$input_json" \
             | jq --indent 4 --sort-keys \
-            > "../results/${test_name}-solc-output.json"
-    jq . "../results/time-${test_name}-solc.json"
+            > "$output_json_solc"
+    jq . "$output_time_solc"
 
     printf "%s" "${test_name}: parasolc"
+    local output_json_parasolc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-parasolc-output.json"
+    local output_time_parasolc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-parasolc.json"
     time_to_json_file \
-        "../results/time-${test_name}-parasolc.json" \
+        "$output_time_parasolc" \
         ../parasolc.sh --standard-json - --base-path "$project_dir" \
             < "$input_json" \
             | jq --indent 4 --sort-keys \
-            > "../results/${test_name}-parasolc-output.json"
-    jq . "../results/time-${test_name}-parasolc.json"
+            > "$output_json_parasolc"
+    jq . "$output_time_parasolc"
 
-    diff --brief --report-identical-files \
-        "../results/${test_name}-parasolc-output.json" \
-        "../results/${test_name}-solc-output.json"
+    diff --brief --report-identical-files "$output_json_parasolc" "$output_json_solc"
     echo
 }
 
@@ -79,11 +82,11 @@ function foundry_benchmark {
     local project_subdir="$1"
 
     local output_dir solc_path parasolc_path project_dir
-    output_dir=$(realpath ../results/)
+    output_dir=$(realpath "${PARASOLC_OUTPUT_DIR}/results/")
     # Use `command` to make it work with a system-wide `solc` binary as well.
     solc_path=$(realpath "$(command -v "$SOLC_BINARY")")
     parasolc_path=$(realpath ../parasolc.sh)
-    project_dir="../contracts/${project_subdir}"
+    project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
 
     pushd "${project_dir}" > /dev/null
 
@@ -98,8 +101,8 @@ function foundry_benchmark {
     popd > /dev/null
 }
 
-rm -rf ../results/
-mkdir -p ../results/
+rm -rf "${PARASOLC_OUTPUT_DIR}/results/"
+mkdir -p "${PARASOLC_OUTPUT_DIR}/results/"
 
 # Ignore failing diff. We want to see all benchmarks, even if they fail.
 # And failures are currently expected due to limitations of the script.
