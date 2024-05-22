@@ -65,40 +65,42 @@ function compare_and_report_results {
         "$(jq '.sys | round'       "$parasolc_time_json")"
 }
 
-function execute_test {
+function compile_standard_json {
+    local compiler="$1"
+    local test_name="$2"
+    local project_dir="$3"
+    local json_output_path="$4"
+    local time_output_path="$5"
+
+    local input_json="${project_dir}/${test_name}.json"
+
+    { [[ $compiler == solc ]] && local compiler_path="$SOLC_BINARY"; } || \
+        { [[ $compiler == parasolc ]] && local compiler_path=../parasolc.sh; }
+
+    cp "${test_name}.json" "$input_json"
+    printf "%s" "${test_name}: ${compiler} | "
+    time_to_json_file \
+        "$time_output_path" \
+        "$compiler_path" --standard-json - --base-path "$project_dir" \
+            < "$input_json" \
+            | jq --indent 4 --sort-keys \
+            > "$json_output_path"
+    cat "$time_output_path"
+}
+
+function compiler_benchmark {
     local test_name="$1"
     local project_subdir="$2"
 
     local project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
-    local input_json="${project_dir}/${test_name}.json"
-    cp "${test_name}.json" "$input_json"
+    local output_prefix="${PARASOLC_OUTPUT_DIR}/results/${test_name}"
 
-    printf "%s" "${test_name}: solc     | "
-    local output_json_solc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-solc.json"
-    local output_time_solc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-solc.json"
-    time_to_json_file \
-        "$output_time_solc" \
-        "$SOLC_BINARY" --standard-json - --base-path "$project_dir" \
-            < "$input_json" \
-            | jq --indent 4 --sort-keys \
-            > "$output_json_solc"
-    cat "$output_time_solc"
-
-    printf "%s" "${test_name}: parasolc | "
-    local output_json_parasolc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-parasolc.json"
-    local output_time_parasolc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-parasolc.json"
-    time_to_json_file \
-        "$output_time_parasolc" \
-        ../parasolc.sh --standard-json - --base-path "$project_dir" \
-            < "$input_json" \
-            | jq --indent 4 --sort-keys \
-            > "$output_json_parasolc"
-    cat "$output_time_solc"
-
+    compile_standard_json solc     "$test_name" "$project_dir" "${output_prefix}-solc.json"     "${output_prefix}-solc-time.json"
+    compile_standard_json parasolc "$test_name" "$project_dir" "${output_prefix}-parasolc.json" "${output_prefix}-parasolc-time.json"
     compare_and_report_results \
         "$test_name" \
-        "$output_time_solc" "$output_time_parasolc" \
-        "$output_json_solc" "$output_json_parasolc" \
+        "${output_prefix}-solc-time.json" "${output_prefix}-parasolc-time.json" \
+        "${output_prefix}-solc.json"      "${output_prefix}-parasolc.json" \
         >> "$report_file"
 }
 
@@ -116,33 +118,41 @@ function forge_build {
         --no-cache
 }
 
-function foundry_benchmark {
-    local project_subdir="$1"
+function compile_with_foundry {
+    local compiler="$1"
+    local test_name="$2"
+    local project_dir="$3"
+    local time_output_path="$4"
 
-    local output_dir solc_path parasolc_path project_dir
-    output_dir=$(realpath "${PARASOLC_OUTPUT_DIR}/results/")
+    local solc_path compiler_path
     # Use `command` to make it work with a system-wide `solc` binary as well.
     solc_path=$(realpath "$(command -v "$SOLC_BINARY")")
-    parasolc_path=$(realpath ../parasolc.sh)
-    project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
+    { [[ $compiler == solc ]] && compiler_path="$solc_path"; } || \
+        { [[ $compiler == parasolc ]] && compiler_path=$(realpath ../parasolc.sh); }
 
     pushd "${project_dir}" > /dev/null
 
-    echo "${project_subdir}: foundry+solc"
-    local output_time_solc="${output_dir}/time-${project_subdir}-foundry+solc.json"
-    time_to_json_file "$output_time_solc" forge_build "$solc_path" "$solc_path"
-    cat "$output_time_solc"
-
-    echo "${project_subdir}: foundry+parasolc"
-    local output_time_parasolc="${output_dir}/time-${project_subdir}-foundry+parasolc.json"
-    time_to_json_file "$output_time_parasolc" forge_build  "$solc_path" "$parasolc_path"
-    cat "$output_time_parasolc"
+    echo "${test_name}: solc"
+    time_to_json_file "$time_output_path" \
+        forge_build "$solc_path" "$compiler_path"
+    cat "$time_output_path"
 
     popd > /dev/null
+}
 
+function foundry_benchmark {
+    local test_name="$1"
+    local project_subdir="$2"
+
+    local output_prefix="${PARASOLC_OUTPUT_DIR}/results/${test_name}"
+    local project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
+
+    compile_with_foundry solc     "$test_name" "$project_dir" "${output_prefix}-solc-time.json"
+    compile_with_foundry parasolc "$test_name" "$project_dir" "${output_prefix}-parasolc-time.json"
     compare_and_report_results \
-        "${project_subdir} + foundry" \
-        "$output_time_solc" "$output_time_parasolc" \
+        "${test_name}" \
+        "${output_prefix}-solc-time.json" \
+        "${output_prefix}-parasolc-time.json" \
         >> "$report_file"
 }
 
@@ -156,14 +166,14 @@ report_header > "$report_file"
 # Ignore failing diff. We want to see all benchmarks, even if they fail.
 # And failures are currently expected due to limitations of the script.
 
-execute_test oz-erc20 openzeppelin-contracts
-execute_test oz       openzeppelin-contracts
+compiler_benchmark oz-erc20 openzeppelin-contracts
+compiler_benchmark oz       openzeppelin-contracts
 
-execute_test uniswap-pool-manager  v4-core
-execute_test uniswap-big-contracts v4-core
-execute_test uniswap               v4-core
+compiler_benchmark uniswap-pool-manager  v4-core
+compiler_benchmark uniswap-big-contracts v4-core
+compiler_benchmark uniswap               v4-core
 
-foundry_benchmark openzeppelin-contracts
-foundry_benchmark v4-core
+foundry_benchmark oz+foundry      openzeppelin-contracts
+foundry_benchmark uniswap+foundry v4-core || true # Error (2449): Definition of base has to precede definition of derived contract
 
 cat "$report_file"
