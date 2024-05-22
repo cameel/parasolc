@@ -1,0 +1,100 @@
+diff --git a/libsolidity/interface/CompilerStack.cpp b/libsolidity/interface/CompilerStack.cpp
+index 2a9005680..645b85a52 100644
+--- a/libsolidity/interface/CompilerStack.cpp
++++ b/libsolidity/interface/CompilerStack.cpp
+@@ -1984,6 +1984,57 @@ Json CompilerStack::gasEstimates(std::string const& _contractName) const
+ 	return output;
+ }
+
++size_t CompilerStack::compilationCluster(std::string const& _contractName) const
++{
++	solAssert(m_stackState >= AnalysisSuccessful, "Analysis was not successful.");
++
++	return compilationClusters().at(contract(_contractName).contract);
++}
++
++std::map<ContractDefinition const*, size_t> CompilerStack::compilationClusters() const
++{
++	solAssert(m_stackState >= AnalysisSuccessful, "Analysis was not successful.");
++
++	// STEP 1: Create an undirected graph of bytecode dependencies between contracts
++	std::map<ContractDefinition const*, std::set<ContractDefinition const*>> undirectedDependencyGraph;
++	for (auto const& [fullyQualifiedName, contractState]: m_contracts)
++	{
++		undirectedDependencyGraph.emplace(contractState.contract, std::set<ContractDefinition const*>{});
++		for (auto const& [dependency, referencingASTNode]: contractState.contract->annotation().contractDependencies)
++		{
++			undirectedDependencyGraph[contractState.contract].insert(dependency);
++			undirectedDependencyGraph[dependency].insert(contractState.contract);
++		}
++	}
++	solAssert(undirectedDependencyGraph.size() == m_contracts.size());
++
++	// STEP 2: Traverse the graph and find connected components
++	std::map<ContractDefinition const*, size_t> clusterAssignments;
++	size_t currentClusterID = 0;
++	for (auto const& [fullyQualifiedName, contractState]: m_contracts)
++	{
++		if (clusterAssignments.count(contractState.contract) != 0)
++			continue;
++
++		std::set<ContractDefinition const*> clusterMembers =
++			util::BreadthFirstSearch<ContractDefinition const*>{{contractState.contract}}.run(
++				[&](ContractDefinition const* _node, auto&& _addChild) {
++					for (ContractDefinition const* child: undirectedDependencyGraph.at(_node))
++						_addChild(child);
++				}
++			).visited;
++		for (ContractDefinition const* member: clusterMembers)
++		{
++			solAssert(clusterAssignments.count(member) == 0);
++			clusterAssignments[member] = currentClusterID;
++		}
++		++currentClusterID;
++	}
++
++	solAssert(clusterAssignments.size() == m_contracts.size());
++	return clusterAssignments;
++}
++
+ bool CompilerStack::isExperimentalSolidity() const
+ {
+ 	return
+diff --git a/libsolidity/interface/CompilerStack.h b/libsolidity/interface/CompilerStack.h
+ndex ef76764fa..3a37bd789 100644
+--- a/libsolidity/interface/CompilerStack.h
++++ b/libsolidity/interface/CompilerStack.h
+@@ -351,6 +351,8 @@ public:
+ 	/// @returns a JSON representing the estimated gas usage for contract creation, internal and external functions
+ 	Json gasEstimates(std::string const& _contractName) const;
+
++	size_t compilationCluster(std::string const& _contractName) const;
++
+ 	/// Changes the format of the metadata appended at the end of the bytecode.
+ 	void setMetadataFormat(MetadataFormat _metadataFormat) { m_metadataFormat = _metadataFormat; }
+
+@@ -496,6 +498,8 @@ private:
+ 	/// This will generate the metadata and store it in the Contract object if it is not present yet.
+ 	std::string const& metadata(Contract const& _contract) const;
+
++	std::map<ContractDefinition const*, size_t> compilationClusters() const;
++
+ 	/// @returns the offset of the entry point of the given function into the list of assembly items
+ 	/// or zero if it is not found or does not exist.
+ 	size_t functionEntryPoint(
+diff --git a/libsolidity/interface/StandardCompiler.cpp b/libsolidity/interface/StandardCompiler.cpp
+index a54a9aa10..dd168d1f9 100644
+--- a/libsolidity/interface/StandardCompiler.cpp
++++ b/libsolidity/interface/StandardCompiler.cpp
+@@ -1516,6 +1516,8 @@ Json StandardCompiler::compileSolidity(StandardCompiler::InputsAndSettings _inpu
+ 			contractData["userdoc"] = compilerStack.natspecUser(contractName);
+ 		if (isArtifactRequested(_inputsAndSettings.outputSelection, file, name, "devdoc", wildcardMatchesExperimental))
+ 			contractData["devdoc"] = compilerStack.natspecDev(contractName);
++		if (isArtifactRequested(_inputsAndSettings.outputSelection, file, name, "compilationHints", wildcardMatchesExperimental))
++			contractData["compilationHints"]["bytecodeDependencyCluster"] = compilerStack.compilationCluster(contractName);
+
+ 		// IR
+ 		if (compilationSuccess && isArtifactRequested(_inputsAndSettings.outputSelection, file, name, "ir", wildcardMatchesExperimental))
+--
+2.44.0
+
