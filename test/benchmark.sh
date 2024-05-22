@@ -187,6 +187,7 @@ for SPLIT_METHOD in naive clustered; do
 
         foundry_benchmark "oz-${variant}+foundry"      openzeppelin-contracts
         foundry_benchmark "uniswap-${variant}+foundry" v4-core || true # Error (2449): Definition of base has to precede definition of derived contract
+        foundry_benchmark "seaport-${variant}+foundry" seaport
     done
 done
 
