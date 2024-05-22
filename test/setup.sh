@@ -2,11 +2,13 @@
 set -euo pipefail
 
 script_dir="$(dirname "$0")"
-PARASOLC_OUTPUT_DIR=${PARASOLC_OUTPUT_DIR:-"${script_dir}/.."}
 
-rm -rf "${PARASOLC_OUTPUT_DIR}/contracts/"
-mkdir -p "${PARASOLC_OUTPUT_DIR}/contracts/"
-cd "${PARASOLC_OUTPUT_DIR}/contracts/"
+output_dir="${1:-"$script_dir/.."}"
+(( $# <= 1 )) || fail "Usage: test/setup.sh [OUTPUT_DIR]"
+
+rm -rf "${output_dir}/contracts/"
+mkdir -p "${output_dir}/contracts/"
+cd "${output_dir}/contracts/"
 
 git clone --depth=1 https://github.com/OpenZeppelin/openzeppelin-contracts --branch v5.0.2
 cd openzeppelin-contracts/

@@ -11,12 +11,10 @@ SOLC_BINARY ?= $(OUTPUT_DIR)/solc
 all: benchmark
 
 $(OUTPUT_DIR)/contracts/: test/setup.sh
-	PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" test/setup.sh
+	test/setup.sh "$(OUTPUT_DIR)"
 
 benchmark: $(OUTPUT_DIR)/contracts/ test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" \
-	PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" \
-	test/benchmark.sh
+	test/benchmark.sh "$(SOLC_BINARY)" "$(OUTPUT_DIR)"
 
 $(OUTPUT_DIR)/solidity/: compilation-hints-output-with-bytecode-dependency-clusters.patch
 	cd "$(OUTPUT_DIR)"

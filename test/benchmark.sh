@@ -6,8 +6,11 @@ cd "$script_dir"
 
 source ../standard-json-utils.sh
 
-PARASOLC_OUTPUT_DIR="${PARASOLC_OUTPUT_DIR:-..}"
-export SOLC_BINARY="${SOLC_BINARY:-"${PARASOLC_OUTPUT_DIR}/solc"}"
+output_dir="${2:-..}"
+solc_binary="${1:-"${output_dir}/solc"}"
+(( $# <= 2 )) || fail "Usage: test/benchmark.sh SOLC_BINARY [OUTPUT_DIR]"
+
+export SOLC_BINARY="$solc_binary"
 
 function time_to_json_file
 {
@@ -92,8 +95,8 @@ function compiler_benchmark {
     local project_subdir="$3"
 
     local test_label="${test_name}-${test_variant}"
-    local project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
-    local output_prefix="${PARASOLC_OUTPUT_DIR}/results/${test_label}"
+    local project_dir="${output_dir}/contracts/${project_subdir}"
+    local output_prefix="${output_dir}/results/${test_label}"
 
     cp "${test_name}.json" "${project_dir}/${test_name}.json"
     compile_standard_json solc     "$test_name" "$test_label" "$project_dir" "${output_prefix}-solc.json"     "${output_prefix}-solc-time.json"
@@ -145,8 +148,8 @@ function foundry_benchmark {
     local test_label="$1"
     local project_subdir="$2"
 
-    local output_prefix="${PARASOLC_OUTPUT_DIR}/results/${test_label}"
-    local project_dir="${PARASOLC_OUTPUT_DIR}/contracts/${project_subdir}"
+    local output_prefix="${output_dir}/results/${test_label}"
+    local project_dir="${output_dir}/contracts/${project_subdir}"
 
     compile_with_foundry solc     "$test_label" "$project_dir" "${output_prefix}-solc-time.json"
     compile_with_foundry parasolc "$test_label" "$project_dir" "${output_prefix}-parasolc-time.json"
@@ -157,10 +160,10 @@ function foundry_benchmark {
         >> "$report_file"
 }
 
-rm -rf "${PARASOLC_OUTPUT_DIR}/results/"
-mkdir -p "${PARASOLC_OUTPUT_DIR}/results/"
+rm -rf "${output_dir}/results/"
+mkdir -p "${output_dir}/results/"
 
-report_file="${PARASOLC_OUTPUT_DIR}/results/report.md"
+report_file="${output_dir}/results/report.md"
 
 report_header > "$report_file"
 
