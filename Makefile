@@ -14,10 +14,9 @@ $(OUTPUT_DIR)/contracts/: test/setup.sh
 	PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" test/setup.sh
 
 benchmark: $(OUTPUT_DIR)/contracts/ test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" SPLIT_METHOD=naive     ONLY_RELEVANT_SOURCES=false test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" SPLIT_METHOD=clustered ONLY_RELEVANT_SOURCES=false test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" SPLIT_METHOD=naive     ONLY_RELEVANT_SOURCES=true  test/benchmark.sh
-	SOLC_BINARY="$(SOLC_BINARY)" PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" SPLIT_METHOD=clustered ONLY_RELEVANT_SOURCES=true  test/benchmark.sh
+	SOLC_BINARY="$(SOLC_BINARY)" \
+	PARASOLC_OUTPUT_DIR="$(OUTPUT_DIR)" \
+	test/benchmark.sh
 
 $(OUTPUT_DIR)/solidity/: compilation-hints-output-with-bytecode-dependency-clusters.patch
 	cd "$(OUTPUT_DIR)"
