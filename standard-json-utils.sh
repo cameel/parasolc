@@ -27,6 +27,19 @@ function contracts_in_output {
     '
 }
 
+function bytecode_in_output {
+    jq --indent 4 '
+        .contracts
+        | to_entries
+        | map({source: .key} + (.value | to_entries[]))
+        | map({
+            source: .source,
+            contract: .key,
+            bytecode: .value.evm.bytecode.object
+        })[]
+    '
+}
+
 function cluster_ids {
     jq '.cluster'
 }

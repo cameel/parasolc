@@ -4,6 +4,8 @@ set -euo pipefail
 script_dir="$(dirname "$0")"
 cd "$script_dir"
 
+source ../standard-json-utils.sh
+
 PARASOLC_OUTPUT_DIR="${PARASOLC_OUTPUT_DIR:-..}"
 export SOLC_BINARY="${SOLC_BINARY:-"${PARASOLC_OUTPUT_DIR}/solc"}"
 export SPLIT_METHOD="${SPLIT_METHOD:-naive}"
@@ -31,8 +33,8 @@ function time_to_json_file
 }
 
 function report_header {
-    echo "| Test                             | JSON | solc real time | parasolc real time | solc CPU total | parasolc CPU total | solc CPU sys | parasolc CPU sys |"
-    echo "|----------------------------------|-----:|---------------:|-------------------:|---------------:|-------------------:|-------------:|-----------------:|"
+    echo "| Test                             | JSON | bytecode | solc real time | parasolc real time | solc CPU total | parasolc CPU total | solc CPU sys | parasolc CPU sys |"
+    echo "|----------------------------------|-----:|---------:|---------------:|-------------------:|---------------:|-------------------:|-------------:|-----------------:|"
 }
 
 function compare_and_report_results {
@@ -42,14 +44,19 @@ function compare_and_report_results {
     local solc_json="${4:-}"
     local parasolc_json="${5:-}"
 
-    local json_match='❓'
+    local json_match='❓' bytecode_match='❓'
     if [[ $solc_json != "" && $parasolc_json != "" ]]; then
         cmp --quiet "$solc_json" "$parasolc_json" && json_match=✅ || json_match=❌
+        cmp --quiet \
+            <(bytecode_in_output < "$solc_json") \
+            <(bytecode_in_output < "$parasolc_json") \
+            && bytecode_match=✅ || bytecode_match=❌
     fi
 
-    printf '| %-32s | %5s | %12s s | %16s s | %12s s | %16s s | %10s s | %14s s |\n' \
+    printf '| %-32s | %5s | %9s | %12s s | %16s s | %12s s | %16s s | %10s s | %14s s |\n' \
         "$test_name" \
         "$json_match" \
+        "$bytecode_match" \
         "$(jq '.real | round'      "$solc_time_json")" \
         "$(jq '.real | round'      "$parasolc_time_json")" \
         "$(jq '.user+.sys | round' "$solc_time_json")" \
