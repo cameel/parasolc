@@ -2,7 +2,8 @@
 .ONESHELL:
 .SHELLFLAGS += -euo pipefail
 
-SOLC_BINARY ?= solc
+MAKEFILE_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
+SOLC_BINARY ?= $(MAKEFILE_DIR)/solc
 
 .PHONY: all benchmark clean
 

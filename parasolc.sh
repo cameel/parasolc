@@ -3,8 +3,7 @@ set -euo pipefail
 
 script_dir="$(dirname "$0")"
 
-# Use global `solc` by default, but let user specify a different binary by overriding the variable.
-SOLC_BINARY="${SOLC_BINARY:-solc}"
+SOLC_BINARY="${SOLC_BINARY:-"${script_dir}/solc"}"
 SPLIT_METHOD="${SPLIT_METHOD:-naive}"
 
 source "${script_dir}/standard-json-utils.sh"

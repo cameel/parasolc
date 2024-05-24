@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export SOLC_BINARY="${SOLC_BINARY:-solc}"
-
 script_dir="$(dirname "$0")"
+cd "$script_dir"
+
+export SOLC_BINARY="${SOLC_BINARY:-"../solc"}"
+export SPLIT_METHOD="${SPLIT_METHOD:-naive}"
 
 function time_to_json_file
 {
@@ -95,7 +97,6 @@ function foundry_benchmark {
     popd > /dev/null
 }
 
-cd "$script_dir"
 rm -rf ../results/
 mkdir -p ../results/
 
