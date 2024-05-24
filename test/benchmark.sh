@@ -31,19 +31,31 @@ function time_to_json_file
 }
 
 function report_header {
-    echo "| Test                                       | Real time | CPU time (total) | CPU time (sys) |"
-    echo "|--------------------------------------------|-----------|-----------------:|---------------:|"
+    echo "| Test                             | JSON | solc real time | parasolc real time | solc CPU total | parasolc CPU total | solc CPU sys | parasolc CPU sys |"
+    echo "|----------------------------------|-----:|---------------:|-------------------:|---------------:|-------------------:|-------------:|-----------------:|"
 }
 
-function report_test_time {
+function compare_and_report_results {
     local test_name="$1"
-    local time_json_file="$2"
+    local solc_time_json="$2"
+    local parasolc_time_json="$3"
+    local solc_json="${4:-}"
+    local parasolc_json="${5:-}"
 
-    printf '| %-42s | %7s s | %14s s | %12s s |\n' \
+    local json_match='❓'
+    if [[ $solc_json != "" && $parasolc_json != "" ]]; then
+        cmp --quiet "$solc_json" "$parasolc_json" && json_match=✅ || json_match=❌
+    fi
+
+    printf '| %-32s | %5s | %12s s | %16s s | %12s s | %16s s | %10s s | %14s s |\n' \
         "$test_name" \
-        "$(jq '.real | round'      "$time_json_file")" \
-        "$(jq '.user+.sys | round' "$time_json_file")" \
-        "$(jq '.sys | round'       "$time_json_file")"
+        "$json_match" \
+        "$(jq '.real | round'      "$solc_time_json")" \
+        "$(jq '.real | round'      "$parasolc_time_json")" \
+        "$(jq '.user+.sys | round' "$solc_time_json")" \
+        "$(jq '.user+.sys | round' "$parasolc_time_json")" \
+        "$(jq '.sys | round'       "$solc_time_json")" \
+        "$(jq '.sys | round'       "$parasolc_time_json")"
 }
 
 function execute_test {
@@ -55,7 +67,7 @@ function execute_test {
     cp "${test_name}.json" "$input_json"
 
     printf "%s" "${test_name}: solc     | "
-    local output_json_solc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-solc-output.json"
+    local output_json_solc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-solc.json"
     local output_time_solc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-solc.json"
     time_to_json_file \
         "$output_time_solc" \
@@ -63,11 +75,10 @@ function execute_test {
             < "$input_json" \
             | jq --indent 4 --sort-keys \
             > "$output_json_solc"
-    report_test_time "${test_name} (solc)" "$output_time_solc" >> "$report_file"
     cat "$output_time_solc"
 
     printf "%s" "${test_name}: parasolc | "
-    local output_json_parasolc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-parasolc-output.json"
+    local output_json_parasolc="${PARASOLC_OUTPUT_DIR}/results/${test_name}-parasolc.json"
     local output_time_parasolc="${PARASOLC_OUTPUT_DIR}/results/time-${test_name}-parasolc.json"
     time_to_json_file \
         "$output_time_parasolc" \
@@ -75,11 +86,13 @@ function execute_test {
             < "$input_json" \
             | jq --indent 4 --sort-keys \
             > "$output_json_parasolc"
-    report_test_time "${test_name} (parasolc)" "$output_time_parasolc" >> "$report_file"
     cat "$output_time_solc"
 
-    diff --brief --report-identical-files "$output_json_parasolc" "$output_json_solc"
-    echo
+    compare_and_report_results \
+        "$test_name" \
+        "$output_time_solc" "$output_time_parasolc" \
+        "$output_json_solc" "$output_json_parasolc" \
+        >> "$report_file"
 }
 
 function forge_build {
@@ -109,14 +122,21 @@ function foundry_benchmark {
     pushd "${project_dir}" > /dev/null
 
     echo "${project_subdir}: foundry+solc"
-    time_to_json_file "${output_dir}/time-${project_subdir}-foundry+solc.json" forge_build "$solc_path" "$solc_path"
-    report_test_time "${project_subdir} (foundry+solc)" "${output_dir}/time-${project_subdir}-foundry+solc.json" >> "$report_file"
+    local output_time_solc="${output_dir}/time-${project_subdir}-foundry+solc.json"
+    time_to_json_file "$output_time_solc" forge_build "$solc_path" "$solc_path"
+    cat "$output_time_solc"
 
     echo "${project_subdir}: foundry+parasolc"
-    time_to_json_file "${output_dir}/time-${project_subdir}-foundry+parasolc.json" forge_build  "$solc_path" "$parasolc_path"
-    report_test_time "${project_subdir} (foundry+parasolc)" "${output_dir}/time-${project_subdir}-foundry+parasolc.json" >> "$report_file"
+    local output_time_parasolc="${output_dir}/time-${project_subdir}-foundry+parasolc.json"
+    time_to_json_file "$output_time_parasolc" forge_build  "$solc_path" "$parasolc_path"
+    cat "$output_time_parasolc"
 
     popd > /dev/null
+
+    compare_and_report_results \
+        "${project_subdir} + foundry" \
+        "$output_time_solc" "$output_time_parasolc" \
+        >> "$report_file"
 }
 
 rm -rf "${PARASOLC_OUTPUT_DIR}/results/"
@@ -129,14 +149,14 @@ report_header > "$report_file"
 # Ignore failing diff. We want to see all benchmarks, even if they fail.
 # And failures are currently expected due to limitations of the script.
 
-execute_test oz-erc20 openzeppelin-contracts || true
-execute_test oz       openzeppelin-contracts || true
+execute_test oz-erc20 openzeppelin-contracts
+execute_test oz       openzeppelin-contracts
 
-execute_test uniswap-pool-manager  v4-core || true
-execute_test uniswap-big-contracts v4-core || true
-execute_test uniswap               v4-core || true
+execute_test uniswap-pool-manager  v4-core
+execute_test uniswap-big-contracts v4-core
+execute_test uniswap               v4-core
 
-foundry_benchmark openzeppelin-contracts || true
-foundry_benchmark v4-core                || true
+foundry_benchmark openzeppelin-contracts
+foundry_benchmark v4-core
 
 cat "$report_file"
